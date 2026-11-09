@@ -105,7 +105,7 @@ check('registration id equals package name', registration?.id === '@local/dsh-ch
 
 const body = registration.factory(requireShim);
 check('factory returns an object', body !== null && typeof body === 'object');
-check('declares inject: [slots]', Array.isArray(body.inject) && body.inject.includes('slots'), JSON.stringify(body.inject));
+check('declares inject including slots', Array.isArray(body.inject) && body.inject.includes('slots'), JSON.stringify(body.inject));
 // REGRESSION: Cordis resolves a service off `ctx` only when the plugin's own
 // fiber injects it. Accessing `ctx.sessions` without declaring it throws
 // `cannot get property "sessions" without inject` — which broke both

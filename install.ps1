@@ -50,7 +50,42 @@ $DshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $env:USERPROFIL
 $ProfileDir = Join-Path $DshHome "profiles\$ProfileName"
 $ProfileJson = Join-Path $ProfileDir 'package.json'
 $InstalledDir = Join-Path $ProfileDir 'node_modules\@local\dsh-chat-find'
-$PnpmBin = Join-Path $DshHome 'dsh-runtimes\dsh-primary-runtime\dependencies\pnpm\bin\pnpm.mjs'
+
+# The bundled runtime lives in different places across installs/versions, so
+# probe the known layouts and fall back to PATH (developer machines). This keeps
+# the script working when DSH moves its runtime directory in a future release.
+function Find-Bundled([string]$relative) {
+  $roots = @(
+    (Join-Path $DshHome 'dsh-runtimes\dsh-primary-runtime\dependencies'),
+    "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\primary-runtime\dependencies",
+    "$env:ProgramFiles\DeepSeek Harness\resources\runtime\primary-runtime\dependencies"
+  )
+  foreach ($root in $roots) {
+    if ([string]::IsNullOrWhiteSpace($root)) { continue }
+    $candidate = Join-Path $root $relative
+    if (Test-Path -LiteralPath $candidate) { return $candidate }
+  }
+  return $null
+}
+
+function Find-Node {
+  $bundled = Find-Bundled 'node\bin\node.exe'
+  if ($bundled) { return $bundled }
+  $found = Get-Command node -ErrorAction SilentlyContinue
+  if ($found) { return $found.Source }
+  return $null
+}
+
+function Find-Pnpm {
+  $bundled = Find-Bundled 'pnpm\bin\pnpm.mjs'
+  if ($bundled) { return $bundled }
+  $found = Get-Command pnpm -ErrorAction SilentlyContinue
+  if ($found) { return $found.Source }
+  return $null
+}
+
+$NodeExe = Find-Node
+$PnpmBin = Find-Pnpm
 
 # Read the profile manifest as an object. Kept as a helper so backup + write
 # stay in one place and a malformed JSON fails before anything is mutated.
@@ -60,7 +95,10 @@ function Read-ProfileJson {
 }
 
 function Write-ProfileJson($json) {
-  $json | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $ProfileJson -Encoding UTF8
+  # Windows PowerShell 5.1 writes a BOM with -Encoding UTF8; DSH parses this
+  # file as JSON, so write UTF-8 without BOM explicitly.
+  $text = $json | ConvertTo-Json -Depth 20
+  [System.IO.File]::WriteAllText($ProfileJson, $text + "`n", (New-Object System.Text.UTF8Encoding($false)))
 }
 
 function Get-BundleList($json) {
@@ -109,9 +147,10 @@ switch ($Action) {
     if (Test-Path $ProfileJson) { Write-Host "backup: $(Backup $ProfileJson)" }
 
     Write-Host 'step 1/2: linking the package into the profile (pnpm file: copy)...'
-    if (-not (Test-Path $PnpmBin)) { throw "pnpm not found at $PnpmBin" }
+    if (-not $NodeExe) { throw 'node not found (DSH bundled runtime or PATH)' }
+    if (-not $PnpmBin) { throw 'pnpm not found (DSH bundled runtime or PATH)' }
     $uri = 'file:' + ($PluginDir -replace '\\', '/')
-    & node $PnpmBin --dir $ProfileDir add $uri
+    & $NodeExe $PnpmBin --dir $ProfileDir add $uri
     if ($LASTEXITCODE -ne 0) { throw "pnpm add failed with exit code $LASTEXITCODE" }
 
     Write-Host 'step 2/2: adding the dsh.profile.bundles entry...'
@@ -147,9 +186,9 @@ switch ($Action) {
         Write-Host '  bundles entry already absent'
       }
     }
-    if (Test-Path $PnpmBin) {
+    if ($NodeExe -and $PnpmBin -and (Test-Path -LiteralPath $PnpmBin)) {
       Write-Host 'removing the dependency...'
-      & node $PnpmBin --dir $ProfileDir remove $PluginName
+      & $NodeExe $PnpmBin --dir $ProfileDir remove $PluginName
     }
     Write-Host ''
     Get-Status | Format-List

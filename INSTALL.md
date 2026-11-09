@@ -1,6 +1,9 @@
-# 安装 dsh-chat-find（Chat 正文查找插件）
+# dsh-chat-find — 开发与故障排查记录
 
-## 当前状态：**已安装 + 已修 6 个 bug（2026-11-08 在真实 GUI 实测通过）**
+> **本文是作者的开发/排障日志，面向维护者与二次开发者，不是安装指南。**
+> 普通用户安装请看 [README](README.md) 的「安装」一节。文中提到的备份文件名、会话编号、日期都是作者本机的记录，你的机器上不会有同名文件。
+
+## 当前状态：**已安装 + 已修 7 个 bug（2026-11-08/09 在真实 GUI 实测通过）**
 
 | 项 | 状态 |
 |---|---|
@@ -114,15 +117,17 @@ pwsh -File "$d\install.ps1" uninstall   # 移除插件行 + 依赖
 
 ### 如果重启后 DSH 起不来
 
-用备份还原这两个文件，然后重启：
+安装脚本在改 profile 前会生成同目录的 `*.bak-<时间戳>` 备份。用最近的一次还原即可：
 
 ```powershell
 $p = "$env:USERPROFILE\.dsh\profiles\desktop"
-Copy-Item "$p\package.json.bak-20261004_174152"      "$p\package.json"      -Force
-Copy-Item "$p\cordis.patch.yml.bak-20261004_174152"  "$p\cordis.patch.yml"  -Force
+Get-ChildItem $p -Filter 'package.json.bak-*' | Sort-Object LastWriteTime -Descending | Select-Object -First 1 |
+  ForEach-Object { Copy-Item $_.FullName "$p\package.json" -Force }
+Get-ChildItem $p -Filter 'cordis.patch.yml.bak-*' | Sort-Object LastWriteTime -Descending | Select-Object -First 1 |
+  ForEach-Object { Copy-Item $_.FullName "$p\cordis.patch.yml" -Force }
 ```
 
-（patch 是纯追加，理论上加载失败只会跳过插件、不会阻止启动；上述还原是万一。）
+（本插件只加 `dsh.profile.bundles` 一行，加载失败理论上只会跳过插件、不会阻止启动；上述还原是万一。）
 
 ---
 

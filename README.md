@@ -4,9 +4,12 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![DSH](https://img.shields.io/badge/DeepSeek%20Harness-0.2.2--rc.1-7c3aed.svg)](#兼容性)
-[![tests](https://img.shields.io/badge/checks-81%2F81-success.svg)](#开发与测试)
+
+> **TL;DR (English)**: Literal-substring find for the DeepSeek Harness chat transcript. Chinese-safe (the host FTS5 tokenizer misses two-character Chinese words), pixel-accurate scroll-to-match across nested scrollports, and highlights via the CSS Custom Highlight API without touching React's DOM. 81 automated checks.
 
 一个 DSH 客户端插件，在**当前会话**内做字面量精确查找（`Ctrl+F` 式），也支持切到**跨会话**搜索。它不修改模型请求、不碰会话日志、Host 半边是空的——只在 Web 界面的会话头部多一个放大镜。
+
+**Trust bar**：不联网（源码无 `fetch`/`XHR`/`WebSocket`）、不写会话日志、Host 半区 `apply(){}` 空实现、只存一个 localStorage 偏好；不改模型请求、不改会话数据。
 
 ![中文搜索示例：输入「插件」，命中 2 处 5 次，结果带轮次号与摘要](docs/hero.png)
 
@@ -21,7 +24,7 @@
 | 方式 | 问题 |
 |---|---|
 | 浏览器 `Ctrl+F` | 只能搜**已经渲染**的 DOM，长会话里前面几屏根本搜不到 |
-| DSH 自带「跨会话搜索」 | SQLite FTS5 用的是 `unicode61` 分词器，**两个汉字的词经常 0 命中** |
+| DSH 的跨会话搜索（`session.search` / FTS5 后端） | SQLite FTS5 用的是 `unicode61` 分词器，**两个汉字的词经常 0 命中** |
 | 目测滚动 | 一条长回复就是几屏高，找一句话像大海捞针 |
 
 DSH 自带的 FTS5 对中文的实测（作者的一次真实语料：219 条 / 233,784 字）：`历史`、`界面`、`功能`、`侧边栏`、`这个网页` 全部返回 **0 命中**——不是没写，是分词器不切中文。这个插件就是为了填上这个洞。
@@ -36,7 +39,7 @@ DSH 自带的 FTS5 对中文的实测（作者的一次真实语料：219 条 / 
 
 自带搜索走 FTS5 分词，本插件走**字面量 substring 扫描**：把当前已渲染的消息行取出来，用大小写不敏感的正则做真实子串匹配。中文没有词边界问题，`界面`、`功能`、`侧边栏` 想搜就搜。
 
-同一批语料上：**插件 0 漏，FTS5 对这批中文词大多 0 命中**。
+同一批语料上，**测试里的 10 个词插件都能命中（FTS5 对其中若干为 0）**。注意这是"词级覆盖"——证明这些词搜得到，不证明"每一次出现都不漏"。
 
 扫描是廉价的：单遍字面量匹配，几十万字符级的真实会话上输入即出结果、无可感知延迟；结果实时刷新（150 ms 防抖）。实际耗时取决于会话长度，可以自己用 `performance.now()` 复测。
 
@@ -46,8 +49,8 @@ DSH 自带的 FTS5 对中文的实测（作者的一次真实语料：219 条 / 
 
 ```text
 [data-conversation-scroll]         ← 会话滚动容器
-└─ [data-chat-anchor-key] 行        ← 「一行」= 一整轮，长回复一行可以 3000–5000px 高
-   └─ [data-step-process-body]      ← 展开的工具调用分组，自带 max-height:400px 内层滚动
+└─ [data-chat-anchor-key] 行        ← 「一行」= 一条消息/一个 flow 节点，长回复一行可数千像素高
+   └─ [data-step-process-body]      ← 展开的工具调用分组，自带 max-height:min(400px,50vh) 内层滚动
 ```
 
 两个坑叠在一起：
@@ -73,42 +76,60 @@ DSH 自带的 FTS5 对中文的实测（作者的一次真实语料：219 条 / 
 
 ## 安装
 
-前提：DSH 桌面版（Windows / macOS / Linux），已有一个 profile（通常是 `~/.dsh/profiles/desktop`）。
+**前提**：DSH 桌面版。**Windows 已实测**；macOS/Linux 未实测——插件本身不依赖平台 API，但安装脚本是 PowerShell，非 Windows 请用方式 A 或 C。已有一个 profile（默认 `~/.dsh/profiles/desktop`，实际名字可在 DSH 设置里看到）。
 
-### 方式 A：脚本安装（推荐）
+> **包名说明**：`@local/dsh-chat-find` 里的 `@local/` 是 DSH 本地插件的命名空间（官方模板即如此），**不是 npm 包**。本仓库不发布 npm；`package.json` 的 `private: true` 表示"只从源码安装"。
+
+### 方式 A：在 DSH 插件页安装本地 bundle（推荐）
+
+这是 DSH 官方路径（对应 `plugin_manager install_bundle`，参数是插件目录的**绝对路径**）：由 DSH 自己写 profile 并启用插件，不需要手改 `package.json`。
+
+1. `git clone https://github.com/ye001991g/dsh-chat-find.git`
+2. 在 DSH 里安装这个本地 bundle：用插件页/插件市场里的"安装本地插件"入口（**不同 DSH 版本的菜单名可能不同**；官方保证的等价命令是 `plugin_manager install_bundle`，参数为 `dsh-chat-find` 目录的绝对路径）
+3. 在插件列表里确认 `chat-find` 显示 **运行中**
+4. 重启 DSH（首次装载需要）
+5. 打开任意会话，右上角出现放大镜
+
+### 方式 B：脚本安装（离线/批处理备选）
+
+需要 **Node 22+** 与 PowerShell（Windows 自带 5.1 即可，不需要 `pwsh`）。脚本会优先用 DSH 自带的 Node，找不到才回退到 PATH 里的 `node`。
 
 ```powershell
 git clone https://github.com/ye001991g/dsh-chat-find.git
 cd dsh-chat-find
-pwsh -File .\install.ps1 install
+powershell -ExecutionPolicy Bypass -File .\install.ps1 install
 ```
 
-脚本会：① 把插件装进 profile 的 `node_modules`；② 在 profile 的 `package.json` 的 `dsh.profile.bundles` 里加一行。然后**重启 DSH 一次**（首次装载需要重启，之后改代码走热重载）。
+- profile 不叫 `desktop` 时加参数：`-ProfileName <你的 profile 名>`。
+- 脚本做两件事：① 把插件装进 profile 的 `node_modules`；② 在 profile 的 `package.json` 的 `dsh.profile.bundles` 里加一行。
+- 装完**重启 DSH 一次**（首次装载；之后改插件代码走热重载）。
+- 卸载：`powershell -ExecutionPolicy Bypass -File .\install.ps1 uninstall`
 
-### 方式 B：手动三步
+> ⚠️ **不要**再往 `cordis.patch.yml` 里加 `insert` 行：`dsh.profile.bundles` 的条目已经会自动应用包自带的 patch，重复挂载会让同一个 `slot id` 注册两次而报错（见 [INSTALL.md](INSTALL.md) 的 Bug 4）。
+
+### 方式 C：完全手动（开发者/排障）
 
 ```powershell
 # 1. 克隆
 git clone https://github.com/ye001991g/dsh-chat-find.git
 
-# 2. 装进 profile（路径按你的实际安装位置替换）
-node "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\pnpm\bin\pnpm.mjs" `
-  --dir "$env:USERPROFILE\.dsh\profiles\desktop" `
-  add "file:<你的仓库路径>"
+# 2. 装进 profile：pnpm 在 DSH 的 runtime 目录里，路径随版本变化，先确认存在
+#    常见位置：<DSH安装目录>\resources\runtime\primary-runtime\dependencies\pnpm\bin\pnpm.mjs
+#              或 ~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/pnpm/bin/pnpm.mjs
+node "<pnpm.mjs 路径>" --dir "$env:USERPROFILE\.dsh\profiles\desktop" add "file:<你的仓库绝对路径>"
 
-# 3. 在 ~/.dsh/profiles/desktop/package.json 的 "dsh.profile.bundles" 数组里加一行：
+# 3. 在 profile 的 package.json 的 "dsh.profile.bundles" 数组里加一行：
 #    "@local/dsh-chat-find"
 
 # 4. 重启 DSH
 ```
 
-> ⚠️ **不要**再往 `cordis.patch.yml` 里加 `insert` 行：`dsh.profile.bundles` 的条目已经会自动应用包自带的 patch，重复挂载会让同一个 `slot id` 注册两次而报错。详见 [INSTALL.md](INSTALL.md) 的 Bug 4。
+### 装完看不到放大镜？按这 4 步排查
 
-### 卸载
-
-```powershell
-pwsh -File .\install.ps1 uninstall
-```
+1. **插件是"运行中"吗**：设置 → 插件，确认 `chat-find` 开关是开的（刚装完默认可能是关闭）。
+2. **装进的是你正在用的 profile 吗**：多 profile 时容易装错；脚本方式用 `-ProfileName` 指定。
+3. **重启过了吗**：首次装载必须重启（新客户端模块无法热加载）；之后改插件代码不需要。
+4. 仍然没有：打开开发者工具，看 console 里是否有 `[chat-find]` 开头的报错。
 
 ---
 
@@ -133,7 +154,7 @@ pwsh -File .\install.ps1 uninstall
 
 ### 对比
 
-| | 浏览器 Ctrl+F | DSH 自带跨会话搜索 | 本插件 |
+| | 浏览器 Ctrl+F | DSH 的跨会话搜索 | 本插件 |
 |---|---|---|---|
 | 中文两字词 | ✅ | ❌ 常 0 命中 | ✅ |
 | 未渲染的历史 | ❌ | ✅ | ✅（载入更早后） |
@@ -148,7 +169,7 @@ pwsh -File .\install.ps1 uninstall
 这个插件全部逻辑在客户端（`client.js`），Host 半边（`index.js`）是空的——不注册服务、不碰 RPC、不影响模型请求。几个值得参考的点：
 
 - **注册方式**：`window.__ModuleLoader__.load({ id, factory })` + `ctx.slots.inject('conversation.session.header.actions', ...)`；`inject: ['slots', 'sessions']`（漏了 `sessions` 会报 `cannot get property "sessions" without inject`）。
-- **浮层必须 portal**：会话头部的动作槽渲染在 `.titleCluster` 内，该容器有 `overflow: clip` + 渐隐 mask；`position:absolute` 的下拉面板会被裁成一条不可见的横条。正确做法是 `ReactDOM.createPortal(panel, document.body)` + `position:fixed`，坐标由 trigger 的 `getBoundingClientRect()` 算出。
+- **浮层必须 portal**：会话头部的动作槽渲染在 `.titleCluster` 内；DSH 0.2.2-rc.1 实测该容器有 `overflow: clip` + 渐隐 mask（版本升级后结构可能变化），`position:absolute` 的下拉面板会被裁成一条不可见的横条。正确做法是 `ReactDOM.createPortal(panel, document.body)` + `position:fixed`，坐标由 trigger 的 `getBoundingClientRect()` 算出。
 - **查找用 Range，不用 DOM 改写**：匹配高亮走 `CSS.highlights`，滚动定位走 `Range.getBoundingClientRect()`；扫描结果缓存 `{key, turn, text, firstRange}`。
 - **嵌套滚动容器要逐层处理**：`[data-conversation-scroll]` 是外层，`[data-step-process-body]` 是内层（展开的工具分组）；只滚一个会"点了没反应/跳错地方"。
 - **流式安全**：点击时校验 `hit.el.isConnected` 与 `Range.startContainer.isConnected`，失效则按 `data-chat-anchor-key` 重查行、重建 Range。
@@ -182,6 +203,8 @@ node test-chinese-recall.mjs    # 可选：中文召回 vs 宿主 FTS5 的横向
 ```
 
 合计 **81/81** 通过（前四个不依赖本机数据，任何环境可直接跑；`test-chinese-recall.mjs` 需要本机会话数据，无数据时输出 skip 并以 0 退出）。
+
+> `test-scroll.mjs` 的 18 项在第二轮代码复核时被**变异测试**验证过：把实现故意改坏（只滚第一个容器、或点击时不重建失效的 Range），对应断言立刻失败。这保证测试钉住的是行为，而不是复述实现。
 
 ## License
 

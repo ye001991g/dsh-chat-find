@@ -1,11 +1,12 @@
 /**
- * Prove the plugin's matcher retrieves Chinese that the FTS5 backend misses.
+ * Compare Chinese recall: the plugin's literal matcher vs the shipped FTS5.
  *
- * Uses the REAL session log (decoded in the sibling helper) as the corpus and
- * the REAL plugin file as the implementation, so the comparison is
- * apples-to-apples:
- *
- *   unicode61 (what dsh-session-query-sqlite uses)  vs  this plugin's matcher
+ * Corpus: the real local session log (decoded from `~/.dsh/sessions`).
+ * Implementation: `compileQuery` lives inside the plugin's browser bundle
+ * factory and is not importable, so this test uses a MIRROR of it — same
+ * whitespace-splitting, same regex escaping, same `giu` flags. Treat the result
+ * as TERM-LEVEL coverage ("can the plugin find this term at all"), not as proof
+ * that every occurrence is found. Keep the mirror in sync with client.js.
  *
  * Run: node test-chinese-recall.mjs
  *
