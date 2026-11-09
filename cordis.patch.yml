@@ -1,0 +1,9 @@
+# Bundle patch for @local/dsh-chat-find.
+#
+# `- insert:` adds our plugin row to the composed profile tree. The row name
+# equals the package name, so the loader resolves `index.js` (the Host half)
+# and, because `dsh.client` is declared in package.json, the Client module
+# bundle registers itself into the browser's module table.
+- insert:
+    - id: chat-find
+      name: '@local/dsh-chat-find'

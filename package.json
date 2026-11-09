@@ -1,0 +1,44 @@
+{
+  "name": "@local/dsh-chat-find",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Literal-substring find for the DeepSeek Harness chat transcript: Chinese-safe matching, pixel-accurate scroll-to-match across nested scrollports, and an optional cross-session search toggle.",
+  "license": "MIT",
+  "author": "ye001991g",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ye001991g/dsh-chat-find.git"
+  },
+  "homepage": "https://github.com/ye001991g/dsh-chat-find#readme",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "search",
+    "find-in-page",
+    "chinese"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    },
+    "meta": {
+      "title": "Chat Find",
+      "description": "Find text inside the current conversation (literal match, works for Chinese), plus an optional search across all past sessions."
+    }
+  }
+}
