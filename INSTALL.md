@@ -149,7 +149,7 @@ node "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\pnpm\b
 
 然后 **重启 DSH 一次**（首次装载）。
 
-> ⚠️ **重启会终止我们这个会话。** 所以请在你不需要我继续干活的时候做。
+> ⚠️ **重启会终止当前正在进行的 DSH 会话。** 所以请在不需要继续干活的时候做。
 >
 > ⚠️ 客户端 JS 是**新模块**，所以必须重启才能加载（HMR 只能热替换已经加载过的世代，不能首次装载一个新模块）。
 

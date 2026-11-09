@@ -76,7 +76,7 @@ DSH 自带的 FTS5 对中文的实测（作者的一次真实语料：219 条 / 
 
 ## 安装
 
-**前提**：DSH 桌面版。**Windows 已实测**；macOS/Linux 未实测——插件本身不依赖平台 API，但安装脚本是 PowerShell，非 Windows 请用方式 A 或 C。已有一个 profile（默认 `~/.dsh/profiles/desktop`，实际名字可在 DSH 设置里看到）。
+**前提**：DSH 桌面版。**Windows 已实测**；macOS/Linux 未实测——插件本身不依赖平台 API，但安装脚本是 PowerShell，非 Windows 请只用**方式 A**（方式 C 的 `$env:USERPROFILE` 需换成 `~`）。已有一个 profile（默认 `~/.dsh/profiles/desktop`，实际名字可在 DSH 设置里看到）。
 
 > **包名说明**：`@local/dsh-chat-find` 里的 `@local/` 是 DSH 本地插件的命名空间（官方模板即如此），**不是 npm 包**。本仓库不发布 npm；`package.json` 的 `private: true` 表示"只从源码安装"。
 
